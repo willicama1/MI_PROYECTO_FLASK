@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+
+{% block title %}Resultado - Mi Proyecto Flask{% endblock %}
+
+{% block content %}
+<h2>¡Datos guardados correctamente!</h2>
+<p>Los datos se han almacenado en TXT, JSON, CSV y SQLite.</p>
+<a href="{{ url_for('formulario') }}">Volver al formulario</a>
+{% endblock %}
