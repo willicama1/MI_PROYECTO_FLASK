@@ -2,25 +2,9 @@ from flask import Flask, render_template, request, redirect, url_for, jsonify
 import os
 import json
 import csv
-from flask_sqlalchemy import SQLAlchemy
+from Conexion.conexion import obtener_conexion
 
 app = Flask(__name__)
-
-# --------------------------
-# CONFIGURACIÓN BASE DE DATOS
-# --------------------------
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database/usuarios.db'
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
-
-# Modelo para SQLite
-class Usuario(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    nombre = db.Column(db.String(100))
-    correo = db.Column(db.String(100))
-
-with app.app_context():
-    db.create_all()
 
 # --------------------------
 # RUTAS PRINCIPALES
@@ -44,6 +28,21 @@ def formulario():
 @app.route("/resultado")
 def resultado():
     return render_template("resultado.html")
+
+# --------------------------
+# PRUEBA DE CONEXIÓN A MYSQL
+# --------------------------
+@app.route("/test_db")
+def test_db():
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute("SELECT DATABASE();")
+        resultado = cursor.fetchone()
+        conexion.close()
+        return f"Conexión exitosa a la base de datos: {resultado[0]}"
+    except Exception as e:
+        return f"Error en la conexión: {str(e)}"
 
 # --------------------------
 # GUARDAR DATOS EN DIFERENTES FORMATOS
@@ -73,10 +72,18 @@ def guardar():
         writer = csv.writer(f)
         writer.writerow([nombre, correo])
 
-    # 4. Guardar en SQLite
-    nuevo_usuario = Usuario(nombre=nombre, correo=correo)
-    db.session.add(nuevo_usuario)
-    db.session.commit()
+    # 4. Guardar en MySQL
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute(
+            "INSERT INTO usuarios (nombre, correo) VALUES (%s, %s)",
+            (nombre, correo)
+        )
+        conexion.commit()
+        conexion.close()
+    except Exception as e:
+        return f"Error guardando en MySQL: {str(e)}"
 
     return redirect(url_for("resultado"))
 
@@ -110,10 +117,20 @@ def ver_csv():
 
 @app.route("/ver_db")
 def ver_db():
-    usuarios = Usuario.query.all()
-    if usuarios:
-        return "<br>".join([f"{u.nombre} - {u.correo}" for u in usuarios])
-    return "No hay datos en la base de datos."
+    try:
+        conexion = obtener_conexion()
+        cursor = conexion.cursor()
+        cursor.execute("SELECT nombre, correo FROM usuarios")
+        usuarios = cursor.fetchall()
+        conexion.close()
+        if usuarios:
+            return "<br>".join([f"{u[0]} - {u[1]}" for u in usuarios])
+        return "No hay datos en la base de datos."
+    except Exception as e:
+        return f"Error leyendo MySQL: {str(e)}"
 
+# --------------------------
+# EJECUTAR APP
+# --------------------------
 if __name__ == "__main__":
     app.run(debug=True)
